@@ -46,12 +46,14 @@
 #define CURSOR_DELTA_SPEED 5                      //Delta value that is used to calculate USB cursor speed levels
 #define CURSOR_RADIUS 30.0                        //Constant joystick radius
 
+#define CHANGE_TOLERANCE 3                       // TODO Can be dynamically set to % value of xxxMaxDebug
 //***VARIABLE DECLARATION***//
 
 int cursorSpeedCounter = 5;                       //Cursor speed counter which is set to 4 by default 
 
 
 int xHigh, yHigh, xLow, yLow;                       
+int xHighPrev, yHighPrev, xLowPrev, yLowPrev;
 int xRight, xLeft, yUp, yDown;                    //Individual neutral starting positions for each FSR
 
 int xHighMax, xLowMax, yHighMax, yLowMax;         //Max FSR values which are set to the values from EEPROM
@@ -210,6 +212,12 @@ void loop() {
   yHigh = analogRead(Y_DIR_HIGH_PIN);             //Read analog values of FSR's : A0
   yLow = analogRead(Y_DIR_LOW_PIN);               //Read analog values of FSR's : A10
 
+  bool skipChange = abs(xHigh - xHighPrev) < CHANGE_TOLERANCE && abs(xLow - xLowPrev) < CHANGE_TOLERANCE && abs(yHigh - yHighPrev) < CHANGE_TOLERANCE && abs(yLow - yLowPrev) < CHANGE_TOLERANCE;
+  xHighPrev = xHigh;
+  xLowPrev = xLow;
+  yHighPrev = yHigh;
+  yLowPrev = yLow;
+
   xHighYHigh = sqrt(sq(((xHigh - xRight) > 0) ? (float)(xHigh - xRight) : 0.0) + sq(((yHigh - yUp) > 0) ? (float)(yHigh - yUp) : 0.0));     //The sq() function raises thr input to power of 2 and is returning the same data type int->int
   xHighYLow = sqrt(sq(((xHigh - xRight) > 0) ? (float)(xHigh - xRight) : 0.0) + sq(((yLow - yDown) > 0) ? (float)(yLow - yDown) : 0.0));    //The sqrt() function raises input to power 1/2, returning a float type
   xLowYHigh = sqrt(sq(((xLow - xLeft) > 0) ? (float)(xLow - xLeft) : 0.0) + sq(((yHigh - yUp) > 0) ? (float)(yHigh - yUp) : 0.0));          //These are the vector magnitudes of each quadrant 1-4. Since the FSRs all register
@@ -221,7 +229,7 @@ void loop() {
     pollCounter++;
     delay(20); 
     //Perform cursor movment actions if joystick has been in active zone for 3 or more poll counts
-    if (pollCounter >= 3) {
+    if (!skipChange && pollCounter >= 3) {
         if ((xHighYHigh >= xHighYLow) && (xHighYHigh >= xLowYHigh) && (xHighYHigh >= xLowYLow)) {
           //Serial.println("quad1");
           Mouse.move(xCursorHigh(xHigh), yCursorHigh(yHigh), 0);
@@ -733,10 +741,10 @@ void joystickInitialization(void) {
   yLow = analogRead(Y_DIR_LOW_PIN);                 //Set the initial Initial neutral y-low value of joystick
   delay(10);
 
-  xRight = xHigh;
-  xLeft = xLow;
-  yUp = yHigh;
-  yDown = yLow;
+  xHighPrev = xRight = xHigh;
+  xLowPrev = xLeft = xLow;
+  yHighPrev = yUp = yHigh;
+  yLowPrev = yDown = yLow;
 
   EEPROM.get(6, yHighComp);
   delay(10);
